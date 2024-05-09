@@ -81,27 +81,27 @@
     et: HaNetz (Mishor)
     en: Sunrise (Sea Level)
   descriptionInclude: zmanDescription/hanetz.md
-- id: latestShmaMGA
+- id: latestShma
   attributes:
     yomTovInclusive:
     luachInclusive:
     condition:
-  timeGetter: getSofZmanShmaMGA
+  complex: true
+  complexTimeGetters:
+    - names:
+        hb: מג'א
+        et: MG"A
+        en: MG"A
+      timeGetter: getSofZmanShmaMGA
+    - names:
+        hb: גר'א
+        et: GR"A
+        en: GR"A
+      timeGetter: getSofZmanShmaGRA
   names:
-    hb: סוף זמן שמע מג'א
-    et: Sof Zman Shema (MG'A)
-    en: Latest Shema (MG'A)
-  descriptionInclude: zmanDescription/kriatShema.md
-- id: latestShmaGRA
-  attributes:
-    yomTovInclusive:
-    luachInclusive:
-    condition:
-  timeGetter: getSofZmanShmaGRA
-  names:
-    hb: סוף זמן שמע גר'א
-    et: Sof Zman Shema (GR'A)
-    en: Latest Shema (GR'A)
+    hb: סוף זמן שמע
+    et: Sof Zman Shema
+    en: Latest Shema
   descriptionInclude: zmanDescription/kriatShema.md
 - id: SofZmanAchilatChametz
   attributes:

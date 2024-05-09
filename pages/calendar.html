@@ -80,7 +80,11 @@ chaiTable: true
 				<details
 					data-zmanid="{{ item.id }}"
 					class="loading"
-					{% if item.timeGetter %}data-timeGetter="{{ item.timeGetter }}"{% endif %}
+					{% if item.timeGetter %}
+						data-timeGetter="{{ item.timeGetter }}"
+					{% elsif item.complex %}
+						data-complexTimeGetters="{{ item.complexTimeGetters | jsonify | escape }}"
+					{% endif %}
 					{% if item.specialDropdownContent %}data-specialDropdownContent{% endif %}
 					{% if item.attributes.luachInclusive %}data-luachInclusive="{{ item.attributes.luachInclusive }}"{% endif %}
 					{% if item.attributes.yomTovInclusive %}data-yomTovInclusive="{{ item.attributes.yomTovInclusive }}"{% endif %}

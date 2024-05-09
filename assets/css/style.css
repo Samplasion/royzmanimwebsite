@@ -98,8 +98,37 @@ body.lang-en .lang:not(.lang-en) {
   }
 }
 
-.nextZman .timeDisplay::before {
+[dir=ltr] .nextZman .timeDisplay::before {
   content: "> "
+}
+[dir=rtl] .nextZman .timeDisplay::after {
+  content: "> "
+}
+
+.timeDisplay .fixed-width {
+  display: inline-block;
+  width: calc(2em / 3);
+  text-align: center;
+}
+
+[dir=rtl] .timeDisplay, [dir=rtl] .timeDisplay .complex-time {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+.timeDisplay.complex {
+  display: flex;
+  flex-direction: row;
+}
+
+.timeDisplay.complex .divider {
+  width: calc(6em / 3); /* 3 characters */
+}
+
+.timeDisplay.complex .complex-time-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .card>.list-group {

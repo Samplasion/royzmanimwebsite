@@ -41,13 +41,23 @@ class zmanimListUpdater {
 					'hb': timeSlot.querySelector('span.lang.lang-hb').innerHTML,
 					'en': timeSlot.querySelector('span.lang.lang-en').innerHTML,
 					'en-et': timeSlot.querySelector('span.lang.lang-et').innerHTML
-				}
+				},
+				isComplex: !!timeSlot.getAttribute('data-complexTimeGetters'),
+				complexFunctions: JSON.parse(timeSlot.getAttribute('data-complexTimeGetters') || "[]")
 			}])
 			.filter(
-				arrayEntry =>
-					arrayEntry[0] !== null
+				arrayEntry => {
+					if (arrayEntry[0] === null) return false;
+					if (arrayEntry[0] == 'candleLighting') return true;
 					// @ts-ignore
-				&& (arrayEntry[0] == 'candleLighting' || (arrayEntry[1].function && methodNames.includes(arrayEntry[1].function)))
+					if (arrayEntry[1].isComplex) {
+						// @ts-ignore
+						return arrayEntry[1].complexFunctions.some(func => methodNames.includes(func.timeGetter));
+					} else {
+						// @ts-ignore
+						return (arrayEntry[1].function && methodNames.includes(arrayEntry[1].function));
+					}
+				}
 			)
 			.reduce(function (obj, [key, val]) {
 				//@ts-ignore
@@ -784,6 +794,26 @@ class zmanimListUpdater {
 		}
 
 		const zmanInfo = this.jCal.getZmanimInfo(false, this.zmanFuncs, this.zmanimList, this.zmanInfoSettings);
+
+		let longestTimeLength = 0;
+
+		for (const zman of Object.values(zmanInfo)) {
+			if (!zman.display) continue;
+
+			if (zman.luxonObj != null) {
+				const timeLength = zman.luxonObj.toLocaleString(...this.dtF).length;
+				if (timeLength > longestTimeLength) {
+					longestTimeLength = timeLength;
+				}
+			} else {
+				const timeString = zman.complexLuxonObjs.map(({ time }) => time.toLocaleString(...this.dtF)).join(' - ');
+				const timeLength = timeString.length;
+				if (timeLength > longestTimeLength) {
+					longestTimeLength = timeLength;
+				}
+			}
+		}
+
 		for (const calendarContainer of document.querySelectorAll('[data-zfFind="calendarFormatter"]')) {
 			for (const timeSlot of calendarContainer.children) {
 				if (!(timeSlot instanceof HTMLElement))
@@ -795,6 +825,7 @@ class zmanimListUpdater {
 				}
 
 				const zmanId = timeSlot.getAttribute('data-zmanid');
+				console.log(zmanId, zmanInfo[zmanId]);
 				if (!(zmanId in zmanInfo) || zmanInfo[zmanId].display == -1) {
 					timeSlot.style.display = 'none';
 					continue;
@@ -806,10 +837,32 @@ class zmanimListUpdater {
 					continue;
 				}
 
-				const actionToClass = (this.isNextUpcomingZman(zmanInfo[zmanId].luxonObj) ? "add" : "remove")
-				timeSlot.classList[actionToClass]("nextZman")
+				const isComplex = zmanInfo[zmanId].complexLuxonObjs.length > 0;
+				console.log(zmanId, isComplex, zmanInfo[zmanId].complexLuxonObjs);
 
-				timeSlot.querySelector('.timeDisplay').innerHTML = zmanInfo[zmanId].luxonObj.toLocaleString(...this.dtF)
+				/** @type {"add" | "remove"} */
+				// Overridden by one of the if branches
+				let actionToClass = "remove";
+				if (isComplex) {
+					actionToClass = zmanInfo[zmanId].complexLuxonObjs.some(({time}) => this.isNextUpcomingZman(time)) ? "add" : "remove";
+
+					const complexTimeSlot = timeSlot.querySelector('.timeDisplay');
+					complexTimeSlot.classList.add("complex");
+					
+					const times = zmanInfo[zmanId].complexLuxonObjs
+						.map(entry => this.complexTimeEntry(entry))
+						.join('<div class="divider"></div>');
+
+					complexTimeSlot.innerHTML = times;
+				} else {
+					actionToClass = (this.isNextUpcomingZman(zmanInfo[zmanId].luxonObj) ? "add" : "remove")
+					timeSlot.querySelector('.timeDisplay').classList.remove("complex");
+					timeSlot.querySelector('.timeDisplay').innerHTML = this._fakeMonospace(this._centerText(
+						zmanInfo[zmanId].luxonObj.toLocaleString(...this.dtF),
+						longestTimeLength
+					));
+				}
+				timeSlot.classList[actionToClass]("nextZman")
 
 				if (timeSlot.hasAttribute('data-specialDropdownContent')) {
 					const description = timeSlot.querySelector('.accordianContent');
@@ -851,7 +904,39 @@ class zmanimListUpdater {
 			if (shaahZmanitCont instanceof HTMLElement)
 				this.shaahZmanits(shaahZmanitCont);
 		}
-		
+	}
+
+	/**
+	 * @param {{time: KosherZmanim.Temporal.ZonedDateTime;names: {"en-et": string;en: string;hb: string;};}} time
+	 */
+	complexTimeEntry(time) {
+		return `<div class="complex-time-entry">
+			<div class="complex-time-label">
+				<span class="lang lang-hb">${time.names.hb}</span>
+				<span class="lang lang-en">${time.names.en}</span>
+				<span class="lang lang-et">${time.names["en-et"]}</span>				
+			</div>
+			<div class="complex-time">
+				${this._fakeMonospace(time.time.toLocaleString(...this.dtF))}
+			</div>
+		</div>`;
+	}
+
+	/**
+	 * @param {string} str 
+	 */
+	_fakeMonospace(str) {
+		return str.split("").map(char => `<span class="fixed-width">${char}</span>`).join("");
+	}
+
+	/**
+	 * @param {string} str
+	 * @param {number} length
+	 */
+	_centerText(str, length) {
+		const padding = Math.max(0, length - str.length) / 2;
+		// RTL compat
+		return (" ".repeat(~~padding) + str + " ".repeat(Math.ceil(padding)));
 	}
 
 	/**
@@ -940,7 +1025,14 @@ class zmanimListUpdater {
 
 		for (const time of [0, 1]) {
 			this.changeDate(KosherZmanim.Temporal.Now.plainDateISO().add({ days: time }), true);
-			zmanim.push(...Object.values(this.jCal.getZmanimInfo(false,this.zmanFuncs,this.zmanimList,this.zmanInfoSettings)).filter(obj => obj.display == 1).map(time => time.luxonObj));
+			const zmanimInfo = this.jCal.getZmanimInfo(false,this.zmanFuncs,this.zmanimList,this.zmanInfoSettings);
+			const values = Object.values(zmanimInfo).filter(obj => obj.display == 1);
+			for (const zman of values) {
+				if (zman.complexLuxonObjs.length > 0)
+					zmanim.push(...zman.complexLuxonObjs.map(({ time }) => time));
+				else
+					zmanim.push(zman.luxonObj);
+			}
 		}
 
 		this.changeDate(currentSelectedDate, true); //reset the date to the current date

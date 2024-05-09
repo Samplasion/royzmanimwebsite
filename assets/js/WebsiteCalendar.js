@@ -110,11 +110,11 @@ class WebsiteCalendar extends KosherZmanim.JewishCalendar {
 	/**
 	 * @param {boolean} independent
 	 * @param {AmudehHoraahZmanim|OhrHachaimZmanim} zmanCalc
-	 * @param {{ [s: string]: { function: string|null; yomTovInclusive: string|null; luachInclusive: "degrees"|"seasonal"|null; condition: string|null; title: { "en-et": string; en: string; hb: string; }}; }} zmanList
+	 * @param {{ [s: string]: { function: string|null; yomTovInclusive: string|null; luachInclusive: "degrees"|"seasonal"|null; condition: string|null; title: { "en-et": string; en: string; hb: string; }; isComplex: boolean; complexFunctions: { names: { hb: string, en: string, et: string }; timeGetter: string; }[]; }; }} zmanList
 	 * @param {{ hourCalculator: "degrees" | "seasonal"; tzeithIssurMelakha: { minutes: number; degree: number;}; tzeitTaanitHumra: boolean; }} funcSettings 
 	 */
 	getZmanimInfo(independent, zmanCalc, zmanList, funcSettings) {
-		/** @type {Record<string, {display: -2|-1|0|1, code: string[], luxonObj: KosherZmanim.Temporal.ZonedDateTime, title: { hb: string, en: string, "en-et": string }}>} */
+		/** @type {Record<string, {display: -2|-1|0|1, code: string[], luxonObj: KosherZmanim.Temporal.ZonedDateTime, complexLuxonObjs: {time: KosherZmanim.Temporal.ZonedDateTime, names: { "en-et": string; en: string; hb: string; }}[], title: { hb: string, en: string, "en-et": string }}>} */
 		const calculatedZmanim = {}
 
 		for (const [zmanId, zmanInfo] of Object.entries(zmanList)) {
@@ -122,6 +122,7 @@ class WebsiteCalendar extends KosherZmanim.JewishCalendar {
 				display: 1,
 				code: [],
 				luxonObj: null,
+				complexLuxonObjs: [],
 				title: {
 					hb: null,
 					en: null,
@@ -155,6 +156,23 @@ class WebsiteCalendar extends KosherZmanim.JewishCalendar {
 			if (zmanInfo.function) {
 				// @ts-ignore
 				calculatedZmanim[zmanId].luxonObj = zmanCalc[zmanInfo.function]()
+			} else if (zmanInfo.isComplex) {
+				console.log(zmanId, zmanInfo.complexFunctions);
+				// @ts-ignore
+				calculatedZmanim[zmanId].complexLuxonObjs = zmanInfo.complexFunctions
+					// @ts-ignore
+					.filter(({ timeGetter }) => zmanCalc[timeGetter])
+					.map(({ names, timeGetter }) => {
+						// @ts-ignore
+						const time = zmanCalc[timeGetter]();
+						return {
+							time,
+							names: {
+								...names,
+								'en-et': names.et,
+							}
+						};
+					});
 			}
 
 			/* Hardcoding below - Thankfully managed to condense this entire project away from the 2700 lines of JS it was before, but some of it still needed to stay */
@@ -272,7 +290,7 @@ class WebsiteCalendar extends KosherZmanim.JewishCalendar {
 				}
 			}
 
-			if (!calculatedZmanim[zmanId].luxonObj) {
+			if (!calculatedZmanim[zmanId].luxonObj && !calculatedZmanim[zmanId].complexLuxonObjs.length) {
 				calculatedZmanim[zmanId].display = -2;
 				calculatedZmanim[zmanId].code.push("Invalid Date");
 			}
